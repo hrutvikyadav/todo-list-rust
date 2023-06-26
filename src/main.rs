@@ -7,19 +7,16 @@ struct Todo {
     duedate: (i32,i32,i32),
 }
 impl Todo {
-    fn create_todo(desc: String, stat: TodoStatus, due: (i32, i32, i32)) -> Self {
+    fn create_todo(desc: String, due: (i32, i32, i32)) -> Self {
         Self {
             description: desc,
-            status: stat,
+            status: TodoStatus::init(),
             duedate: due,
         }
     }
 
-    fn update_status(self, newstatus: TodoStatus) -> Self {
-        match self.status {
-            TodoStatus::Done => todo!(),
-            _ => Self { status: newstatus, ..self }
-        }
+    fn update_status(self) -> Self {
+        Self { status: self.status.toggle(), ..self }
     }
 }
 
@@ -28,8 +25,53 @@ enum TodoStatus {
     ToDo,
     InProgress,
     Blocked,
-    Wait,
     Done,
+    Closed,
+}
+impl TodoStatus {
+    fn init() -> Self {
+        TodoStatus::ToDo
+    }
+
+    fn toggle(self) -> Self {
+        println!("Which status to toggle to?\ntd - ToDo\nip - InProgress\nb - Blocked\nd - Done\nc - Closed");
+        let mut ns = String::new();
+        io::stdin()
+            .read_line(&mut ns)
+            .expect("Failed to read command");
+        match ns.trim().to_lowercase().as_str() {
+            "td" => self,
+            "ip" => match self {
+                Self::ToDo => Self::InProgress,
+                Self::InProgress => Self::InProgress,
+                Self::Blocked => Self::InProgress,
+                Self::Done => Self::InProgress,
+                Self::Closed => Self::InProgress,
+            },
+            "b" => match self {
+                Self::ToDo => Self::Blocked,
+                Self::InProgress => Self::Blocked,
+                Self::Blocked => Self::Blocked,
+                Self::Done => Self::Done,
+                Self::Closed => Self::Closed,
+            },
+            "d" => match self {
+                Self::ToDo => Self::ToDo,
+                Self::InProgress => Self::Done,
+                Self::Blocked => Self::Blocked,
+                Self::Done => Self::Done,
+                Self::Closed => Self::Closed,
+            },
+            "c" => match self {
+                Self::ToDo => Self::Closed,
+                Self::InProgress => Self::Closed,
+                Self::Blocked => Self::Closed,
+                Self::Done => Self::Done,
+                Self::Closed => Self::Closed,
+            },
+            _ => todo!(),
+        }
+    }
 }
 
 struct TodoList {
@@ -44,7 +86,7 @@ impl TodoList {
         self.todos.push(td)
     }
     fn display_l(&self) {
-        println!("============================================\nList\n============================================");
+        println!("============================================\nProject: {:?}\n============================================", self.project_name);
         for td in &self.todos {
             println!("Item = {:?}", td);
         }
@@ -69,7 +111,7 @@ impl Command {
                 let due = (1,1,2023);
                 println!("Default due date added!\nEnter task description");
                 io::stdin().read_line(&mut desc).expect("Failed to get desc");
-                Command::Create(Todo { description: desc, status: TodoStatus::ToDo, duedate: due })
+                Command::Create(Todo::create_todo(desc, due))
             },
             "u" => {
                 println!("Enter todo id to update:");
@@ -81,14 +123,6 @@ impl Command {
             _ => todo!(),
         }
     }
-}
-
-fn display(lot: &Vec<Todo>) {
-    println!("============================================\nList\n============================================");
-    for td in lot {
-        println!("Item = {:?}", td);
-    }
-    println!("============================================");
 }
 
 fn main() {
@@ -111,8 +145,8 @@ fn main() {
         println!("Processing - {}", user_command);
         let processed_command = Command::process(user_command, &mut td_list);
         let p_c_res = match processed_command {
-            Command::Create(td) => Some(Todo::create_todo(td.description, td.status, td.duedate)),
-            Command::Update(td) => Some(td.update_status(TodoStatus::Wait)),
+            Command::Create(td) => Some(td),
+            Command::Update(td) => Some(td.update_status()),
             Command::Archive(_) => todo!(),
             Command::ListOut => {
                 //display(&todo_list);
